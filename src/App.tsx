@@ -14,14 +14,17 @@ import {
   ZoomOut,
   Maximize2,
   Download,
-  Loader2
+  Loader2,
+  ExternalLink,
+  X,
+  FileText
 } from 'lucide-react';
 import { CoverPage } from './components/CoverPage';
 import { ExamPage } from './components/ExamPage';
 import { AnswerKeyPage } from './components/AnswerKeyPage';
 import { allQuestions, getQuestionsByPage, testMetadata } from './data';
 import { generateAndDownloadDocx, generateAndDownloadAnswerDocx } from './utils/docxExport';
-import { triggerPrintToPdf, generateDirectPdf } from './utils/pdfExport';
+import { triggerPrintToPdf, generatePdfFromElements, triggerDownloadBlob } from './utils/pdfExport';
 
 export default function App() {
   // Document selection: 'question_paper' or 'answer_paper'
@@ -33,16 +36,26 @@ export default function App() {
   const [showAnswers, setShowAnswers] = useState<boolean>(false);
   const [isExportingDocx, setIsExportingDocx] = useState<boolean>(false);
   const [questionSearch, setQuestionSearch] = useState<string>('');
-  const [downloadSuccess, setDownloadSuccess] = useState<string | null>(null);
 
   // Zoom In / Zoom Out states (50% to 200%)
   const [zoomLevel, setZoomLevel] = useState<number>(100);
 
-  // Direct PDF Export states
+  // PDF Export states & Modal
+  const [isExportModalOpen, setIsExportModalOpen] = useState<boolean>(false);
   const [isGeneratingPdf, setIsGeneratingPdf] = useState<boolean>(false);
-  const [pdfProgress, setPdfProgress] = useState<{ current: number; total: number } | null>(null);
+  const [pdfProgress, setPdfProgress] = useState<{ current: number; total: number; statusText: string } | null>(null);
+  
+  // Stored completed PDF for direct user download link (solves iframe popup blocker issues 100%)
+  const [completedPdf, setCompletedPdf] = useState<{
+    url: string;
+    filename: string;
+    pageCount: number;
+    fileSizeMb?: string;
+  } | null>(null);
 
-  // Reference to main stage for PDF capturing
+  const [downloadSuccess, setDownloadSuccess] = useState<string | null>(null);
+
+  // Reference to main stage for capturing
   const documentStageRef = useRef<HTMLDivElement>(null);
 
   // Total pages is strictly 20
@@ -95,7 +108,7 @@ export default function App() {
         await generateAndDownloadAnswerDocx();
         setDownloadSuccess('Separate Answer Paper & Solutions (.docx) downloaded successfully!');
       }
-      setTimeout(() => setDownloadSuccess(null), 4000);
+      setTimeout(() => setDownloadSuccess(null), 5000);
     } catch (err) {
       console.error('Failed to export DOCX:', err);
     } finally {
@@ -103,48 +116,92 @@ export default function App() {
     }
   };
 
-  // Direct PDF Download: Creates exact replica of on-screen pages without browser print interference
-  const handleExactPdfDownload = async (allPages: boolean = true) => {
+  /**
+   * Robust PDF Generator:
+   * Supports 'all_20_pages', 'current_page', or 'answers'
+   */
+  const handleExportPdf = async (scope: 'all_20_pages' | 'current_page' | 'answers') => {
     try {
       setIsGeneratingPdf(true);
-      setPdfProgress({ current: 0, total: allPages ? totalPages : 1 });
+      setIsExportModalOpen(false);
 
-      if (activeDocument === 'question_paper') {
-        // If user wants all 20 pages but is in single view, temporarily switch to all pages view
-        if (allPages && viewMode !== 'all') {
+      // Temporarily reset CSS zoom on container so coordinates are exact
+      const stageEl = documentStageRef.current;
+      const origZoom = stageEl ? stageEl.style.zoom : '';
+      if (stageEl) {
+        stageEl.style.zoom = '100%';
+      }
+
+      let sheetsToExport: HTMLElement[] = [];
+      let filename = 'NEET_2026_PT-2_Question_Paper_20Pages.pdf';
+
+      if (scope === 'all_20_pages') {
+        filename = 'NEET_2026_PT-2_Exact_Question_Paper_20Pages.pdf';
+        
+        // Ensure all 20 pages are in the DOM
+        if (viewMode !== 'all') {
           setViewMode('all');
-          // Allow DOM to render all pages
-          await new Promise(resolve => setTimeout(resolve, 500));
+          // Allow DOM to finish mounting 20 pages
+          await new Promise(resolve => setTimeout(resolve, 350));
         }
 
-        if (documentStageRef.current) {
-          const filename = allPages 
-            ? 'NEET_2026_PT-2_Exact_Question_Paper_20Pages.pdf' 
-            : `NEET_2026_PT-2_Page_${currentPage}.pdf`;
+        const nodes = documentStageRef.current?.querySelectorAll<HTMLElement>('.a4-sheet');
+        sheetsToExport = nodes ? Array.from(nodes) : [];
+      } else if (scope === 'current_page') {
+        filename = `NEET_2026_PT-2_Page_${currentPage}.pdf`;
+        const nodes = documentStageRef.current?.querySelectorAll<HTMLElement>('.a4-sheet');
+        if (nodes && nodes.length > 0) {
+          sheetsToExport = [nodes[0]];
+        }
+      } else if (scope === 'answers') {
+        filename = 'NEET_2026_PT-2_Separate_Answer_Paper_and_Solutions.pdf';
+        if (activeDocument !== 'answer_paper') {
+          setActiveDocument('answer_paper');
+          await new Promise(resolve => setTimeout(resolve, 300));
+        }
+        const nodes = documentStageRef.current?.querySelectorAll<HTMLElement>('.a4-sheet');
+        sheetsToExport = nodes ? Array.from(nodes) : [];
+      }
 
-          await generateDirectPdf(
-            documentStageRef.current,
-            filename,
-            (current, total) => setPdfProgress({ current, total })
-          );
-          setDownloadSuccess(`Exact PDF (${filename}) generated and downloaded successfully!`);
-          setTimeout(() => setDownloadSuccess(null), 4000);
-        }
-      } else {
-        // Answer paper PDF
-        if (documentStageRef.current) {
-          await generateDirectPdf(
-            documentStageRef.current,
-            'NEET_2026_PT-2_Exact_Answer_Paper_and_Solutions.pdf',
-            (current, total) => setPdfProgress({ current, total })
-          );
-          setDownloadSuccess('Answer Paper Exact PDF generated and downloaded successfully!');
-          setTimeout(() => setDownloadSuccess(null), 4000);
-        }
+      if (sheetsToExport.length === 0) {
+        throw new Error('No pages found to export.');
+      }
+
+      setPdfProgress({
+        current: 0,
+        total: sheetsToExport.length,
+        statusText: 'Preparing pages for high-resolution capture...'
+      });
+
+      const result = await generatePdfFromElements(
+        sheetsToExport,
+        filename,
+        (current, total, statusText) => setPdfProgress({ current, total, statusText })
+      );
+
+      // Restore zoom
+      if (stageEl && origZoom) {
+        stageEl.style.zoom = origZoom;
+      }
+
+      if (result.success && result.url && result.blob) {
+        const sizeMb = (result.blob.size / (1024 * 1024)).toFixed(2);
+        setCompletedPdf({
+          url: result.url,
+          filename: result.filename,
+          pageCount: result.pageCount,
+          fileSizeMb: sizeMb
+        });
+        setDownloadSuccess(`PDF Ready: ${result.filename} (${sizeMb} MB)`);
       }
     } catch (err) {
-      console.error('Failed to generate direct PDF:', err);
-      alert('Could not generate direct PDF. You can also use the "Print / System PDF" button.');
+      console.error('Failed to generate PDF:', err);
+      // Ensure zoom is restored even on error
+      if (documentStageRef.current) {
+        documentStageRef.current.style.zoom = `${zoomLevel}%`;
+      }
+      setDownloadSuccess('Could not automatically package PDF. Use "Browser Print (Ctrl+P)" to save directly.');
+      setTimeout(() => setDownloadSuccess(null), 6000);
     } finally {
       setIsGeneratingPdf(false);
       setPdfProgress(null);
@@ -189,6 +246,36 @@ export default function App() {
 
           {/* Action Buttons: Word (.docx) & PDF */}
           <div className="flex items-center flex-wrap gap-2">
+            {/* Primary Direct PDF Download Button */}
+            <button
+              id="download-exact-pdf-btn"
+              onClick={() => handleExportPdf('all_20_pages')}
+              disabled={isGeneratingPdf}
+              className="inline-flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white font-bold text-xs px-3 py-1.5 rounded shadow transition-all cursor-pointer disabled:opacity-50"
+              title="Download exact high-resolution 20-page PDF directly to your computer"
+            >
+              {isGeneratingPdf ? (
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+              ) : (
+                <Download className="w-3.5 h-3.5" />
+              )}
+              <span>
+                {isGeneratingPdf 
+                  ? `Saving PDF (${pdfProgress ? `${pdfProgress.current}/${pdfProgress.total}` : '...'})` 
+                  : 'Download PDF'}
+              </span>
+            </button>
+
+            {/* Quick Export Options Modal Button */}
+            <button
+              onClick={() => setIsExportModalOpen(true)}
+              className="inline-flex items-center gap-1 bg-emerald-800 hover:bg-emerald-700 text-emerald-100 font-semibold text-xs px-2 py-1.5 rounded border border-emerald-600 cursor-pointer"
+              title="Open all PDF and Word download options"
+            >
+              <FileText className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Options</span>
+            </button>
+
             {/* Word DOCX Button */}
             <button
               id="download-word-btn"
@@ -207,26 +294,6 @@ export default function App() {
               </span>
             </button>
 
-            {/* Direct Exact PDF Button (Pixel-perfect copy of website, zero extra spaces) */}
-            <button
-              id="download-exact-pdf-btn"
-              onClick={() => handleExactPdfDownload(true)}
-              disabled={isGeneratingPdf}
-              className="inline-flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white font-bold text-xs px-3 py-1.5 rounded shadow transition-all cursor-pointer disabled:opacity-50"
-              title="Download exact high-resolution PDF file directly without browser printer dialog"
-            >
-              {isGeneratingPdf ? (
-                <Loader2 className="w-3.5 h-3.5 animate-spin" />
-              ) : (
-                <Download className="w-3.5 h-3.5" />
-              )}
-              <span>
-                {isGeneratingPdf 
-                  ? `Saving PDF (${pdfProgress ? `${pdfProgress.current}/${pdfProgress.total}` : '...'})` 
-                  : 'Download Exact PDF'}
-              </span>
-            </button>
-
             {/* Browser Print / System PDF */}
             <button
               id="download-pdf-btn"
@@ -235,7 +302,7 @@ export default function App() {
               title="Open browser print dialog (Ctrl+P)"
             >
               <Printer className="w-3.5 h-3.5" />
-              <span className="hidden md:inline">Print / System PDF</span>
+              <span className="hidden md:inline">Print (Ctrl+P)</span>
             </button>
 
             {/* Answer markings preview toggle on question paper */}
@@ -408,7 +475,49 @@ export default function App() {
         </div>
       </header>
 
-      {/* Generating PDF Modal / Overlay */}
+      {/* PERSISTENT DOWNLOAD READY BANNER (Solves browser popup/iframe blocking permanently) */}
+      {completedPdf && (
+        <div className="no-print bg-emerald-700 text-white py-2.5 px-4 shadow-lg border-b border-emerald-600 flex flex-wrap items-center justify-between gap-3 animate-in fade-in duration-200">
+          <div className="flex items-center gap-2 text-xs">
+            <CheckCircle2 className="w-4 h-4 text-emerald-200 shrink-0" />
+            <span>
+              <strong className="font-bold">{completedPdf.filename}</strong> ({completedPdf.pageCount} Pages, {completedPdf.fileSizeMb} MB) is generated!
+            </span>
+          </div>
+
+          <div className="flex items-center gap-2">
+            {/* Direct <a> tag with download attribute for guaranteed 1-click user saving */}
+            <a
+              href={completedPdf.url}
+              download={completedPdf.filename}
+              className="inline-flex items-center gap-1.5 bg-white text-emerald-950 font-bold text-xs px-3 py-1 rounded shadow hover:bg-emerald-50 transition-colors"
+            >
+              <Download className="w-3.5 h-3.5" />
+              <span>Click to Save File</span>
+            </a>
+
+            <a
+              href={completedPdf.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1 bg-emerald-800 hover:bg-emerald-900 text-white text-xs px-2.5 py-1 rounded transition-colors"
+            >
+              <ExternalLink className="w-3 h-3" />
+              <span>Preview</span>
+            </a>
+
+            <button
+              onClick={() => setCompletedPdf(null)}
+              className="text-emerald-200 hover:text-white p-1"
+              title="Dismiss"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Progress Dialog when Generating PDF */}
       {isGeneratingPdf && (
         <div className="fixed inset-0 z-50 bg-stone-950/70 backdrop-blur-xs flex items-center justify-center p-4">
           <div className="bg-white rounded-xl shadow-2xl p-6 max-w-sm w-full text-center border border-stone-200">
@@ -416,8 +525,8 @@ export default function App() {
             <h3 className="font-bold text-base text-stone-900 mb-1">
               Generating Exact PDF
             </h3>
-            <p className="text-xs text-stone-600 mb-4">
-              Creating a pixel-perfect copy matching the on-screen view without spaces between questions...
+            <p className="text-xs text-stone-600 mb-3">
+              {pdfProgress?.statusText || 'Rendering exact pages without gaps...'}
             </p>
             {pdfProgress && (
               <div className="w-full">
@@ -425,20 +534,115 @@ export default function App() {
                   <span>Page {pdfProgress.current} of {pdfProgress.total}</span>
                   <span>{Math.round((pdfProgress.current / pdfProgress.total) * 100)}%</span>
                 </div>
-                <div className="w-full bg-stone-200 rounded-full h-2 overflow-hidden">
+                <div className="w-full bg-stone-200 rounded-full h-2.5 overflow-hidden">
                   <div 
-                    className="bg-emerald-600 h-2 transition-all duration-200 rounded-full"
+                    className="bg-emerald-600 h-2.5 transition-all duration-200 rounded-full"
                     style={{ width: `${(pdfProgress.current / pdfProgress.total) * 100}%` }}
                   ></div>
                 </div>
               </div>
             )}
+            <p className="text-[11px] text-stone-400 mt-4">
+              Tip: When generation completes, your file will download automatically.
+            </p>
           </div>
         </div>
       )}
 
-      {/* Success Notification Banner */}
-      {downloadSuccess && (
+      {/* Export Options Modal */}
+      {isExportModalOpen && (
+        <div className="fixed inset-0 z-50 bg-stone-950/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-xl shadow-2xl max-w-md w-full p-6 border border-stone-300">
+            <div className="flex justify-between items-center mb-4 pb-2 border-b border-stone-200">
+              <h3 className="font-bold text-base text-stone-900 flex items-center gap-2">
+                <Download className="w-5 h-5 text-emerald-600" />
+                Download Document
+              </h3>
+              <button
+                onClick={() => setIsExportModalOpen(false)}
+                className="text-stone-400 hover:text-stone-700 p-1 rounded-full cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <p className="text-xs text-stone-600 mb-4">
+              Select the format and pages you wish to download:
+            </p>
+
+            <div className="space-y-2.5 text-left">
+              {/* Option 1: Complete 20 Page Question Paper PDF */}
+              <button
+                onClick={() => handleExportPdf('all_20_pages')}
+                className="w-full p-3 rounded-lg border border-emerald-300 bg-emerald-50 hover:bg-emerald-100 text-emerald-950 text-left transition-colors cursor-pointer flex items-center justify-between"
+              >
+                <div>
+                  <div className="font-bold text-xs sm:text-sm">Download All 20 Pages (Question Paper PDF)</div>
+                  <div className="text-[11px] text-emerald-800">Complete NEET test booklet with cover page and all 180 questions</div>
+                </div>
+                <Download className="w-4 h-4 text-emerald-700 shrink-0 ml-2" />
+              </button>
+
+              {/* Option 2: Current Page Only PDF */}
+              <button
+                onClick={() => handleExportPdf('current_page')}
+                className="w-full p-3 rounded-lg border border-stone-300 bg-stone-50 hover:bg-stone-100 text-stone-900 text-left transition-colors cursor-pointer flex items-center justify-between"
+              >
+                <div>
+                  <div className="font-bold text-xs sm:text-sm">Download Current Page (Page {currentPage} PDF)</div>
+                  <div className="text-[11px] text-stone-600">Instant single-page download in less than 1 second</div>
+                </div>
+                <Download className="w-4 h-4 text-stone-700 shrink-0 ml-2" />
+              </button>
+
+              {/* Option 3: Separate Answer Paper & Solutions PDF */}
+              <button
+                onClick={() => handleExportPdf('answers')}
+                className="w-full p-3 rounded-lg border border-amber-300 bg-amber-50 hover:bg-amber-100 text-amber-950 text-left transition-colors cursor-pointer flex items-center justify-between"
+              >
+                <div>
+                  <div className="font-bold text-xs sm:text-sm">Download Answer Paper & Solutions (PDF)</div>
+                  <div className="text-[11px] text-amber-800">180-Question Master OMR Key + Step-by-Step Explanations</div>
+                </div>
+                <Download className="w-4 h-4 text-amber-700 shrink-0 ml-2" />
+              </button>
+
+              {/* Option 4: Word Document (.docx) */}
+              <button
+                onClick={() => {
+                  setIsExportModalOpen(false);
+                  handleDocxDownload();
+                }}
+                className="w-full p-3 rounded-lg border border-blue-300 bg-blue-50 hover:bg-blue-100 text-blue-950 text-left transition-colors cursor-pointer flex items-center justify-between"
+              >
+                <div>
+                  <div className="font-bold text-xs sm:text-sm">Download Word Document (.docx)</div>
+                  <div className="text-[11px] text-blue-800">Fully editable Word format for Microsoft Word or Google Docs</div>
+                </div>
+                <FileDown className="w-4 h-4 text-blue-700 shrink-0 ml-2" />
+              </button>
+
+              {/* Option 5: Browser Print Dialog */}
+              <button
+                onClick={() => {
+                  setIsExportModalOpen(false);
+                  handleBrowserPrint();
+                }}
+                className="w-full p-3 rounded-lg border border-stone-300 hover:bg-stone-100 text-stone-900 text-left transition-colors cursor-pointer flex items-center justify-between"
+              >
+                <div>
+                  <div className="font-bold text-xs sm:text-sm">Open Browser Print (Ctrl+P)</div>
+                  <div className="text-[11px] text-stone-500">Use your system printer or save as PDF directly</div>
+                </div>
+                <Printer className="w-4 h-4 text-stone-600 shrink-0 ml-2" />
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* General Notification Banner */}
+      {downloadSuccess && !completedPdf && (
         <div className="no-print bg-emerald-600 text-white py-2 px-4 text-center text-xs font-semibold shadow flex items-center justify-center gap-2">
           <CheckCircle2 className="w-4 h-4" />
           <span>{downloadSuccess}</span>
@@ -546,7 +750,7 @@ export default function App() {
             <div className="w-full flex flex-col items-center">
               <AnswerKeyPage 
                 onPrint={handleBrowserPrint} 
-                onDirectPdf={() => handleExactPdfDownload(true)} 
+                onDirectPdf={() => handleExportPdf('answers')} 
               />
             </div>
           )}
@@ -601,10 +805,10 @@ export default function App() {
           </div>
           <div className="flex items-center gap-4 shrink-0">
             <button
-              onClick={() => handleExactPdfDownload(true)}
+              onClick={() => handleExportPdf('all_20_pages')}
               className="text-emerald-400 hover:underline cursor-pointer font-semibold"
             >
-              Download Exact PDF
+              Download PDF
             </button>
             <span>•</span>
             <button
