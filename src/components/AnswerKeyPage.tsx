@@ -6,9 +6,10 @@ import { generateAndDownloadAnswerDocx } from '../utils/docxExport';
 
 interface AnswerKeyPageProps {
   onPrint?: () => void;
+  onDirectPdf?: () => void;
 }
 
-export const AnswerKeyPage: React.FC<AnswerKeyPageProps> = ({ onPrint }) => {
+export const AnswerKeyPage: React.FC<AnswerKeyPageProps> = ({ onPrint, onDirectPdf }) => {
   const [selectedSubject, setSelectedSubject] = useState<Subject | 'All'>('All');
   const [searchQuery, setSearchQuery] = useState('');
   const [isExporting, setIsExporting] = useState(false);
@@ -60,15 +61,25 @@ export const AnswerKeyPage: React.FC<AnswerKeyPageProps> = ({ onPrint }) => {
             title="Export separate Word Document (.docx) for Answer Paper only"
           >
             <Download className="w-3.5 h-3.5" />
-            <span>{isExporting ? 'Generating...' : 'Download Answer Paper (.docx)'}</span>
+            <span>{isExporting ? 'Generating...' : 'Word (.docx)'}</span>
           </button>
+          {onDirectPdf && (
+            <button
+              onClick={onDirectPdf}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold transition-colors cursor-pointer"
+              title="Download exact high-res PDF file directly"
+            >
+              <Download className="w-3.5 h-3.5" />
+              <span>Exact PDF (.pdf)</span>
+            </button>
+          )}
           <button
             onClick={onPrint || (() => window.print())}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-400 text-stone-950 text-xs font-bold transition-colors cursor-pointer"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-stone-700 hover:bg-stone-600 text-stone-200 text-xs font-bold transition-colors cursor-pointer"
             title="Print or Save Answer Paper as PDF"
           >
             <Printer className="w-3.5 h-3.5" />
-            <span>Print Answer Paper (PDF)</span>
+            <span>Print (Ctrl+P)</span>
           </button>
         </div>
       </div>
