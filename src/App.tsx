@@ -246,53 +246,47 @@ export default function App() {
 
           {/* Action Buttons: Word (.docx) & PDF */}
           <div className="flex items-center flex-wrap gap-2">
-            {/* Primary Direct PDF Download Button */}
-            <button
+            {/* Primary Direct PDF Download Link - INSTANT, 0 SECONDS */}
+            <a
               id="download-exact-pdf-btn"
-              onClick={() => handleExportPdf('all_20_pages')}
-              disabled={isGeneratingPdf}
-              className="inline-flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white font-bold text-xs px-3 py-1.5 rounded shadow transition-all cursor-pointer disabled:opacity-50"
-              title="Download exact high-resolution 20-page PDF directly to your computer"
+              href={activeDocument === 'question_paper' ? "/NEET_2026_PT_2_Question_Paper_20Pages.pdf" : "/NEET_2026_PT_2_Separate_Answer_Paper.pdf"}
+              download={activeDocument === 'question_paper' ? "NEET_2026_PT_2_Question_Paper_20Pages.pdf" : "NEET_2026_PT_2_Separate_Answer_Paper.pdf"}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white font-bold text-xs px-3.5 py-1.5 rounded shadow transition-all cursor-pointer"
+              title="Instant 1-click download of PDF file directly to your device"
             >
-              {isGeneratingPdf ? (
-                <Loader2 className="w-3.5 h-3.5 animate-spin" />
-              ) : (
-                <Download className="w-3.5 h-3.5" />
-              )}
-              <span>
-                {isGeneratingPdf 
-                  ? `Saving PDF (${pdfProgress ? `${pdfProgress.current}/${pdfProgress.total}` : '...'})` 
-                  : 'Download PDF'}
-              </span>
-            </button>
+              <Download className="w-3.5 h-3.5" />
+              <span>Download PDF</span>
+            </a>
 
             {/* Quick Export Options Modal Button */}
             <button
               onClick={() => setIsExportModalOpen(true)}
-              className="inline-flex items-center gap-1 bg-emerald-800 hover:bg-emerald-700 text-emerald-100 font-semibold text-xs px-2 py-1.5 rounded border border-emerald-600 cursor-pointer"
+              className="inline-flex items-center gap-1 bg-emerald-800 hover:bg-emerald-700 text-emerald-100 font-semibold text-xs px-2.5 py-1.5 rounded border border-emerald-600 cursor-pointer"
               title="Open all PDF and Word download options"
             >
               <FileText className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">Options</span>
+              <span>All Downloads</span>
             </button>
 
-            {/* Word DOCX Button */}
-            <button
+            {/* Word DOCX Button - Instant Download */}
+            <a
               id="download-word-btn"
-              onClick={handleDocxDownload}
-              disabled={isExportingDocx}
-              className="inline-flex items-center gap-1.5 bg-blue-600 hover:bg-blue-500 active:bg-blue-700 text-white font-medium text-xs px-3 py-1.5 rounded shadow transition-all cursor-pointer disabled:opacity-50"
+              href={activeDocument === 'question_paper' ? "/NEET_2026_PT_2_Question_Paper_20Pages.docx" : "/NEET_2026_PT_2_Separate_Answer_Paper.docx"}
+              download={activeDocument === 'question_paper' ? "NEET_2026_PT_2_Question_Paper_20Pages.docx" : "NEET_2026_PT_2_Separate_Answer_Paper.docx"}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1.5 bg-blue-600 hover:bg-blue-500 active:bg-blue-700 text-white font-medium text-xs px-3 py-1.5 rounded shadow transition-all cursor-pointer"
               title={activeDocument === 'question_paper' ? "Download 20-Page Question Paper (.docx)" : "Download Standalone Answer Paper (.docx)"}
             >
               <FileDown className="w-3.5 h-3.5" />
               <span>
-                {isExportingDocx 
-                  ? 'Generating Word...' 
-                  : activeDocument === 'question_paper' 
-                    ? 'Word (.docx)' 
-                    : 'Answer Paper (.docx)'}
+                {activeDocument === 'question_paper' 
+                  ? 'Word (.docx)' 
+                  : 'Answer Paper (.docx)'}
               </span>
-            </button>
+            </a>
 
             {/* Browser Print / System PDF */}
             <button
@@ -475,6 +469,48 @@ export default function App() {
         </div>
       </header>
 
+      {/* QUICK DIRECT DOWNLOAD BAR FOR GUARANTEED ACCESS */}
+      <div className="no-print bg-stone-100 border-b border-stone-300 py-1.5 px-4 shadow-xs">
+        <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-2 text-xs">
+          <div className="flex items-center gap-2 text-stone-700 font-medium">
+            <span className="flex h-2 w-2 rounded-full bg-emerald-500 animate-pulse"></span>
+            <span>Direct Downloads Ready (0s wait, no script required):</span>
+          </div>
+          <div className="flex items-center flex-wrap gap-2">
+            <a
+              href="/NEET_2026_PT_2_Question_Paper_20Pages.pdf"
+              download="NEET_2026_PT_2_Question_Paper_20Pages.pdf"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1 bg-white hover:bg-emerald-50 text-emerald-900 border border-emerald-300 px-2.5 py-1 rounded font-bold transition-colors shadow-xs"
+            >
+              <Download className="w-3 h-3 text-emerald-600" />
+              <span>20-Page Question Paper PDF</span>
+            </a>
+            <a
+              href="/NEET_2026_PT_2_Separate_Answer_Paper.pdf"
+              download="NEET_2026_PT_2_Separate_Answer_Paper.pdf"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1 bg-white hover:bg-amber-50 text-amber-900 border border-amber-300 px-2.5 py-1 rounded font-bold transition-colors shadow-xs"
+            >
+              <Download className="w-3 h-3 text-amber-600" />
+              <span>Answer Key & Solutions PDF</span>
+            </a>
+            <a
+              href="/NEET_2026_PT_2_Question_Paper_20Pages.docx"
+              download="NEET_2026_PT_2_Question_Paper_20Pages.docx"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1 bg-white hover:bg-blue-50 text-blue-900 border border-blue-300 px-2.5 py-1 rounded font-medium transition-colors shadow-xs"
+            >
+              <FileDown className="w-3 h-3 text-blue-600" />
+              <span>Word (.docx)</span>
+            </a>
+          </div>
+        </div>
+      </div>
+
       {/* PERSISTENT DOWNLOAD READY BANNER (Solves browser popup/iframe blocking permanently) */}
       {completedPdf && (
         <div className="no-print bg-emerald-700 text-white py-2.5 px-4 shadow-lg border-b border-emerald-600 flex flex-wrap items-center justify-between gap-3 animate-in fade-in duration-200">
@@ -572,57 +608,94 @@ export default function App() {
 
             <div className="space-y-2.5 text-left">
               {/* Option 1: Complete 20 Page Question Paper PDF */}
-              <button
-                onClick={() => handleExportPdf('all_20_pages')}
-                className="w-full p-3 rounded-lg border border-emerald-300 bg-emerald-50 hover:bg-emerald-100 text-emerald-950 text-left transition-colors cursor-pointer flex items-center justify-between"
+              <a
+                href="/NEET_2026_PT_2_Question_Paper_20Pages.pdf"
+                download="NEET_2026_PT_2_Question_Paper_20Pages.pdf"
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={() => setIsExportModalOpen(false)}
+                className="w-full p-3 rounded-lg border border-emerald-300 bg-emerald-50 hover:bg-emerald-100 text-emerald-950 text-left transition-colors cursor-pointer flex items-center justify-between block"
               >
                 <div>
-                  <div className="font-bold text-xs sm:text-sm">Download All 20 Pages (Question Paper PDF)</div>
-                  <div className="text-[11px] text-emerald-800">Complete NEET test booklet with cover page and all 180 questions</div>
+                  <div className="font-bold text-xs sm:text-sm flex items-center gap-1.5">
+                    <span>Download All 20 Pages (Question Paper PDF)</span>
+                    <span className="bg-emerald-600 text-white text-[9px] px-1.5 py-0.5 rounded font-bold uppercase">Instant</span>
+                  </div>
+                  <div className="text-[11px] text-emerald-800">Complete NEET test booklet with cover page and all 180 questions (Strict 20 Pages)</div>
                 </div>
                 <Download className="w-4 h-4 text-emerald-700 shrink-0 ml-2" />
-              </button>
+              </a>
 
-              {/* Option 2: Current Page Only PDF */}
+              {/* Option 2: Separate Answer Paper & Solutions PDF */}
+              <a
+                href="/NEET_2026_PT_2_Separate_Answer_Paper.pdf"
+                download="NEET_2026_PT_2_Separate_Answer_Paper.pdf"
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={() => setIsExportModalOpen(false)}
+                className="w-full p-3 rounded-lg border border-amber-300 bg-amber-50 hover:bg-amber-100 text-amber-950 text-left transition-colors cursor-pointer flex items-center justify-between block"
+              >
+                <div>
+                  <div className="font-bold text-xs sm:text-sm flex items-center gap-1.5">
+                    <span>Download Answer Paper & Solutions (PDF)</span>
+                    <span className="bg-amber-600 text-white text-[9px] px-1.5 py-0.5 rounded font-bold uppercase">Instant</span>
+                  </div>
+                  <div className="text-[11px] text-amber-800">180-Question Master OMR Key + Step-by-Step NCERT Explanations</div>
+                </div>
+                <Download className="w-4 h-4 text-amber-700 shrink-0 ml-2" />
+              </a>
+
+              {/* Option 3: Word Document (.docx) - Question Paper */}
+              <a
+                href="/NEET_2026_PT_2_Question_Paper_20Pages.docx"
+                download="NEET_2026_PT_2_Question_Paper_20Pages.docx"
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={() => setIsExportModalOpen(false)}
+                className="w-full p-3 rounded-lg border border-blue-300 bg-blue-50 hover:bg-blue-100 text-blue-950 text-left transition-colors cursor-pointer flex items-center justify-between block"
+              >
+                <div>
+                  <div className="font-bold text-xs sm:text-sm flex items-center gap-1.5">
+                    <span>Download Question Paper Word Document (.docx)</span>
+                    <span className="bg-blue-600 text-white text-[9px] px-1.5 py-0.5 rounded font-bold uppercase">Editable</span>
+                  </div>
+                  <div className="text-[11px] text-blue-800">Fully editable Word format for Microsoft Word or Google Docs (20 Pages)</div>
+                </div>
+                <FileDown className="w-4 h-4 text-blue-700 shrink-0 ml-2" />
+              </a>
+
+              {/* Option 4: Word Document (.docx) - Answer Paper */}
+              <a
+                href="/NEET_2026_PT_2_Separate_Answer_Paper.docx"
+                download="NEET_2026_PT_2_Separate_Answer_Paper.docx"
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={() => setIsExportModalOpen(false)}
+                className="w-full p-3 rounded-lg border border-sky-300 bg-sky-50 hover:bg-sky-100 text-sky-950 text-left transition-colors cursor-pointer flex items-center justify-between block"
+              >
+                <div>
+                  <div className="font-bold text-xs sm:text-sm flex items-center gap-1.5">
+                    <span>Download Answer Paper Word Document (.docx)</span>
+                    <span className="bg-sky-600 text-white text-[9px] px-1.5 py-0.5 rounded font-bold uppercase">Editable</span>
+                  </div>
+                  <div className="text-[11px] text-sky-800">Complete Master OMR Table & Detailed Solutions for Word</div>
+                </div>
+                <FileDown className="w-4 h-4 text-sky-700 shrink-0 ml-2" />
+              </a>
+
+              {/* Option 5: Current Page Only PDF */}
               <button
                 onClick={() => handleExportPdf('current_page')}
                 className="w-full p-3 rounded-lg border border-stone-300 bg-stone-50 hover:bg-stone-100 text-stone-900 text-left transition-colors cursor-pointer flex items-center justify-between"
               >
                 <div>
-                  <div className="font-bold text-xs sm:text-sm">Download Current Page (Page {currentPage} PDF)</div>
-                  <div className="text-[11px] text-stone-600">Instant single-page download in less than 1 second</div>
+                  <div className="font-bold text-xs sm:text-sm">Download Current Page Only (Page {currentPage} PDF)</div>
+                  <div className="text-[11px] text-stone-600">Single-page snapshot in under 1 second</div>
                 </div>
                 <Download className="w-4 h-4 text-stone-700 shrink-0 ml-2" />
               </button>
 
-              {/* Option 3: Separate Answer Paper & Solutions PDF */}
-              <button
-                onClick={() => handleExportPdf('answers')}
-                className="w-full p-3 rounded-lg border border-amber-300 bg-amber-50 hover:bg-amber-100 text-amber-950 text-left transition-colors cursor-pointer flex items-center justify-between"
-              >
-                <div>
-                  <div className="font-bold text-xs sm:text-sm">Download Answer Paper & Solutions (PDF)</div>
-                  <div className="text-[11px] text-amber-800">180-Question Master OMR Key + Step-by-Step Explanations</div>
-                </div>
-                <Download className="w-4 h-4 text-amber-700 shrink-0 ml-2" />
-              </button>
-
-              {/* Option 4: Word Document (.docx) */}
-              <button
-                onClick={() => {
-                  setIsExportModalOpen(false);
-                  handleDocxDownload();
-                }}
-                className="w-full p-3 rounded-lg border border-blue-300 bg-blue-50 hover:bg-blue-100 text-blue-950 text-left transition-colors cursor-pointer flex items-center justify-between"
-              >
-                <div>
-                  <div className="font-bold text-xs sm:text-sm">Download Word Document (.docx)</div>
-                  <div className="text-[11px] text-blue-800">Fully editable Word format for Microsoft Word or Google Docs</div>
-                </div>
-                <FileDown className="w-4 h-4 text-blue-700 shrink-0 ml-2" />
-              </button>
-
-              {/* Option 5: Browser Print Dialog */}
+              {/* Option 6: Browser Print Dialog */}
               <button
                 onClick={() => {
                   setIsExportModalOpen(false);
