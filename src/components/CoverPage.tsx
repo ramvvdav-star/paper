@@ -94,7 +94,7 @@ export const CoverPage: React.FC = () => {
                 <span className="font-bold">5.</span> Do not encode or darken more than one circle for answering a particular question for it will be treated as a wrong answer.
               </p>
               <p className="mb-2">
-                <span className="font-bold">6.</span> Rough work is to be done on the space provided for this purpose in the Test Booklet only.
+                <span className="font-bold">6.</span> Rough work is to be done on the rough sheets provided in the Examination Hall.
               </p>
               <p>
                 <span className="font-bold">7.</span> Calculators, Slide Rules, Log Tables, Geometry Box, Electronic Digital Watches with facilities of calculators, cellular phones, pagers or any other electronic gadget are not allowed inside the Examination Hall.

@@ -28,11 +28,11 @@
 @media print {
   @page {
     size: A4 portrait;
-    margin: 8mm 10mm 8mm 10mm;
+    margin: 8mm 10mm;
   }
 
   body {
-    background: transparent !important;
+    background: #ffffff !important;
     padding: 0 !important;
     margin: 0 !important;
   }
@@ -43,13 +43,19 @@
 
   .a4-sheet {
     width: 100% !important;
-    min-height: 280mm !important;
+    max-height: 279mm !important;
+    min-height: unset !important;
     box-shadow: none !important;
     margin: 0 !important;
-    padding-left: 0 !important;
-    padding-right: 0 !important;
+    padding: 16px 14px !important;
     page-break-after: always;
+    page-break-inside: avoid;
     break-after: page;
+    break-inside: avoid;
+    box-sizing: border-box;
+    display: flex !important;
+    flex-direction: column !important;
+    justify-content: space-between !important;
   }
 
   .page-break {

@@ -1,35 +1,36 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState } from 'react';
 import { 
   FileDown, 
   Printer, 
   ChevronLeft, 
   ChevronRight, 
-  BookOpen, 
   CheckCircle2, 
-  Layers, 
-  Search, 
   Eye, 
   EyeOff,
-  Sparkles,
-  Info
+  Info,
+  BookOpen,
+  FileCheck
 } from 'lucide-react';
 import { CoverPage } from './components/CoverPage';
 import { ExamPage } from './components/ExamPage';
 import { AnswerKeyPage } from './components/AnswerKeyPage';
 import { allQuestions, getQuestionsByPage, testMetadata } from './data';
-import { generateAndDownloadDocx } from './utils/docxExport';
+import { generateAndDownloadDocx, generateAndDownloadAnswerDocx } from './utils/docxExport';
 import { triggerPrintToPdf } from './utils/pdfExport';
 
 export default function App() {
-  // Navigation & view states
+  // Document selection: 'question_paper' or 'answer_paper'
+  const [activeDocument, setActiveDocument] = useState<'question_paper' | 'answer_paper'>('question_paper');
+
+  // Question Paper navigation states
   const [currentPage, setCurrentPage] = useState<number>(1);
-  const [viewMode, setViewMode] = useState<'single' | 'all' | 'answers'>('single');
+  const [viewMode, setViewMode] = useState<'single' | 'all'>('single');
   const [showAnswers, setShowAnswers] = useState<boolean>(false);
   const [isExportingDocx, setIsExportingDocx] = useState<boolean>(false);
   const [questionSearch, setQuestionSearch] = useState<string>('');
   const [downloadSuccess, setDownloadSuccess] = useState<string | null>(null);
 
-  // Pages range from 1 to 20
+  // Question Paper is exactly 20 pages (Page 1 = Cover, Pages 2 to 20 = 180 Questions)
   const totalPages = 20;
 
   // Jump to page containing specific question
@@ -38,10 +39,8 @@ export default function App() {
     if (!isNaN(qNum) && qNum >= 1 && qNum <= 180) {
       const q = allQuestions.find(item => item.id === qNum);
       if (q) {
+        setActiveDocument('question_paper');
         setCurrentPage(q.page);
-        if (viewMode === 'answers') {
-          setViewMode('single');
-        }
       }
     }
   };
@@ -49,8 +48,13 @@ export default function App() {
   const handleDocxDownload = async () => {
     try {
       setIsExportingDocx(true);
-      await generateAndDownloadDocx();
-      setDownloadSuccess('Word Document (.docx) generated and downloaded successfully!');
+      if (activeDocument === 'question_paper') {
+        await generateAndDownloadDocx();
+        setDownloadSuccess('Question Paper (.docx - 20 Pages) downloaded successfully!');
+      } else {
+        await generateAndDownloadAnswerDocx();
+        setDownloadSuccess('Separate Answer Paper & Solutions (.docx) downloaded successfully!');
+      }
       setTimeout(() => setDownloadSuccess(null), 4000);
     } catch (err) {
       console.error('Failed to export DOCX:', err);
@@ -60,12 +64,15 @@ export default function App() {
   };
 
   const handlePdfDownload = () => {
-    // Switch to all pages view for comprehensive printing, then trigger print
-    if (viewMode !== 'all') {
-      setViewMode('all');
-      setTimeout(() => {
+    if (activeDocument === 'question_paper') {
+      if (viewMode !== 'all') {
+        setViewMode('all');
+        setTimeout(() => {
+          triggerPrintToPdf();
+        }, 300);
+      } else {
         triggerPrintToPdf();
-      }, 300);
+      }
     } else {
       triggerPrintToPdf();
     }
@@ -73,7 +80,7 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-stone-200 text-stone-900 flex flex-col antialiased">
-      {/* Top Application Toolbar */}
+      {/* Top Application Header */}
       <header className="no-print sticky top-0 z-50 bg-stone-900 text-white shadow-md border-b border-stone-800">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3 flex flex-wrap items-center justify-between gap-4">
           {/* Title and Metadata */}
@@ -83,10 +90,10 @@ export default function App() {
             </div>
             <div>
               <h1 className="font-bold text-sm sm:text-base leading-tight">
-                NEET 2026 Test Paper (Changed Questions • Exact Format)
+                NEET 2026 Test Booklet (Strict 20 Pages + Separate Answer Paper)
               </h1>
               <p className="text-xs text-stone-400 hidden sm:block">
-                180 Questions • Physics, Chemistry & Biology • Exact Times New Roman Typography
+                180 Modified Questions • Pages 1-20 Question Booklet • Zero Waste Blank Space • Standalone Answer Paper
               </p>
             </div>
           </div>
@@ -98,110 +105,144 @@ export default function App() {
               onClick={handleDocxDownload}
               disabled={isExportingDocx}
               className="inline-flex items-center gap-1.5 bg-blue-600 hover:bg-blue-500 active:bg-blue-700 text-white font-medium text-xs sm:text-sm px-3.5 py-1.5 rounded shadow transition-all cursor-pointer disabled:opacity-50"
-              title="Download editable Microsoft Word document (.docx) with exact questions, options, and tables"
+              title={activeDocument === 'question_paper' ? "Download 20-Page Question Paper (.docx)" : "Download Separate Answer Paper (.docx)"}
             >
               <FileDown className="w-4 h-4" />
-              <span>{isExportingDocx ? 'Generating Word...' : 'Download Word (.docx)'}</span>
+              <span>
+                {isExportingDocx 
+                  ? 'Generating Word...' 
+                  : activeDocument === 'question_paper' 
+                    ? 'Download Question Paper (.docx)' 
+                    : 'Download Answer Paper (.docx)'}
+              </span>
             </button>
 
             <button
               id="download-pdf-btn"
               onClick={handlePdfDownload}
               className="inline-flex items-center gap-1.5 bg-red-600 hover:bg-red-500 active:bg-red-700 text-white font-medium text-xs sm:text-sm px-3.5 py-1.5 rounded shadow transition-all cursor-pointer"
-              title="Print or save as high-fidelity vector PDF matching exact exam paper booklet"
+              title={activeDocument === 'question_paper' ? "Print or Save all 20 pages as vector PDF" : "Print or Save Separate Answer Paper as vector PDF"}
             >
               <Printer className="w-4 h-4" />
-              <span>Download PDF / Print</span>
+              <span>
+                {activeDocument === 'question_paper' ? 'Print Question Paper (PDF)' : 'Print Answer Paper (PDF)'}
+              </span>
             </button>
 
-            {/* Answer Toggle */}
-            <button
-              onClick={() => setShowAnswers(!showAnswers)}
-              className={`inline-flex items-center gap-1 text-xs px-2.5 py-1.5 rounded border transition-colors cursor-pointer ${
-                showAnswers 
-                  ? 'bg-emerald-800 border-emerald-600 text-emerald-100' 
-                  : 'bg-stone-800 border-stone-700 text-stone-300 hover:bg-stone-700'
-              }`}
-              title="Toggle answer key markings on pages"
-            >
-              {showAnswers ? <Eye className="w-3.5 h-3.5" /> : <EyeOff className="w-3.5 h-3.5" />}
-              <span className="hidden md:inline">{showAnswers ? 'Hide Answers' : 'Show Answers'}</span>
-            </button>
+            {/* Answer markings preview toggle on question paper */}
+            {activeDocument === 'question_paper' && (
+              <button
+                onClick={() => setShowAnswers(!showAnswers)}
+                className={`inline-flex items-center gap-1 text-xs px-2.5 py-1.5 rounded border transition-colors cursor-pointer ${
+                  showAnswers 
+                    ? 'bg-emerald-800 border-emerald-600 text-emerald-100' 
+                    : 'bg-stone-800 border-stone-700 text-stone-300 hover:bg-stone-700'
+                }`}
+                title="Toggle inline answer key hints on question paper"
+              >
+                {showAnswers ? <Eye className="w-3.5 h-3.5" /> : <EyeOff className="w-3.5 h-3.5" />}
+                <span className="hidden lg:inline">{showAnswers ? 'Hide Key Hints' : 'Show Key Hints'}</span>
+              </button>
+            )}
           </div>
         </div>
 
-        {/* Secondary Navigation Ribbon */}
-        <div className="bg-stone-800/90 border-t border-stone-700 px-4 sm:px-6 py-2">
+        {/* Secondary Navigation Ribbon: Document Switcher & Page Controls */}
+        <div className="bg-stone-800/95 border-t border-stone-700 px-4 sm:px-6 py-2">
           <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-3 text-xs">
-            {/* View Mode Controls */}
-            <div className="flex items-center space-x-1">
+            {/* Primary Document Switcher */}
+            <div className="flex items-center space-x-1.5 bg-stone-900 p-0.5 rounded-lg border border-stone-700">
               <button
-                onClick={() => setViewMode('single')}
-                className={`px-3 py-1 rounded transition-colors font-medium cursor-pointer ${
-                  viewMode === 'single' ? 'bg-amber-500 text-stone-950 font-bold' : 'text-stone-300 hover:bg-stone-700'
+                onClick={() => setActiveDocument('question_paper')}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded font-bold cursor-pointer transition-colors ${
+                  activeDocument === 'question_paper' 
+                    ? 'bg-amber-500 text-stone-950 shadow-xs' 
+                    : 'text-stone-300 hover:text-white hover:bg-stone-800'
                 }`}
               >
-                Page-by-Page
+                <BookOpen className="w-3.5 h-3.5" />
+                <span>Question Paper (Exact 20 Pages)</span>
               </button>
+
               <button
-                onClick={() => setViewMode('all')}
-                className={`px-3 py-1 rounded transition-colors font-medium cursor-pointer ${
-                  viewMode === 'all' ? 'bg-amber-500 text-stone-950 font-bold' : 'text-stone-300 hover:bg-stone-700'
+                onClick={() => setActiveDocument('answer_paper')}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded font-bold cursor-pointer transition-colors ${
+                  activeDocument === 'answer_paper' 
+                    ? 'bg-amber-500 text-stone-950 shadow-xs' 
+                    : 'text-stone-300 hover:text-white hover:bg-stone-800'
                 }`}
               >
-                All 20 Pages
-              </button>
-              <button
-                onClick={() => setViewMode('answers')}
-                className={`px-3 py-1 rounded transition-colors font-medium cursor-pointer ${
-                  viewMode === 'answers' ? 'bg-amber-500 text-stone-950 font-bold' : 'text-stone-300 hover:bg-stone-700'
-                }`}
-              >
-                Answer Key & Solutions
+                <FileCheck className="w-3.5 h-3.5" />
+                <span>Separate Answer Paper</span>
               </button>
             </div>
 
-            {/* Page Selector & Question Jumper */}
-            <div className="flex items-center gap-3">
-              {viewMode === 'single' && (
-                <div className="flex items-center space-x-1.5">
+            {/* Question Paper Sub-Controls */}
+            {activeDocument === 'question_paper' && (
+              <div className="flex items-center gap-3">
+                {/* View Mode Buttons */}
+                <div className="flex items-center space-x-1">
                   <button
-                    disabled={currentPage <= 1}
-                    onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-                    className="p-1 rounded bg-stone-700 hover:bg-stone-600 disabled:opacity-40 cursor-pointer"
+                    onClick={() => setViewMode('single')}
+                    className={`px-2.5 py-1 rounded transition-colors font-medium cursor-pointer ${
+                      viewMode === 'single' ? 'bg-stone-700 text-white font-bold' : 'text-stone-300 hover:bg-stone-700/50'
+                    }`}
                   >
-                    <ChevronLeft className="w-4 h-4" />
+                    Page-by-Page
                   </button>
-                  <span className="px-2 py-0.5 font-mono text-stone-300">
-                    Page {currentPage} of {totalPages}
-                  </span>
                   <button
-                    disabled={currentPage >= totalPages}
-                    onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-                    className="p-1 rounded bg-stone-700 hover:bg-stone-600 disabled:opacity-40 cursor-pointer"
+                    onClick={() => setViewMode('all')}
+                    className={`px-2.5 py-1 rounded transition-colors font-medium cursor-pointer ${
+                      viewMode === 'all' ? 'bg-stone-700 text-white font-bold' : 'text-stone-300 hover:bg-stone-700/50'
+                    }`}
                   >
-                    <ChevronRight className="w-4 h-4" />
+                    All 20 Pages (Print Ready)
                   </button>
                 </div>
-              )}
 
-              {/* Jump to Question */}
-              <div className="flex items-center gap-1.5">
-                <span className="text-stone-400">Go to Q#:</span>
-                <input
-                  type="number"
-                  min="1"
-                  max="180"
-                  placeholder="1-180"
-                  value={questionSearch}
-                  onChange={e => {
-                    setQuestionSearch(e.target.value);
-                    handleJumpToQuestion(e.target.value);
-                  }}
-                  className="w-16 px-2 py-0.5 rounded bg-stone-900 border border-stone-600 text-white text-xs focus:ring-1 focus:ring-amber-400 focus:outline-none"
-                />
+                {/* Page Prev/Next when in Single Page mode */}
+                {viewMode === 'single' && (
+                  <div className="flex items-center space-x-1">
+                    <button
+                      disabled={currentPage <= 1}
+                      onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                      className="p-1 rounded bg-stone-700 hover:bg-stone-600 disabled:opacity-40 cursor-pointer"
+                      title="Previous Page"
+                    >
+                      <ChevronLeft className="w-4 h-4" />
+                    </button>
+                    <span className="px-2 py-0.5 font-mono text-stone-300 text-[11px]">
+                      Pg {currentPage} / {totalPages}
+                    </span>
+                    <button
+                      disabled={currentPage >= totalPages}
+                      onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                      className="p-1 rounded bg-stone-700 hover:bg-stone-600 disabled:opacity-40 cursor-pointer"
+                      title="Next Page"
+                    >
+                      <ChevronRight className="w-4 h-4" />
+                    </button>
+                  </div>
+                )}
+
+                {/* Jump to Question */}
+                <div className="flex items-center gap-1.5">
+                  <span className="text-stone-400">Go to Q#:</span>
+                  <input
+                    type="number"
+                    min="1"
+                    max="180"
+                    placeholder="1-180"
+                    value={questionSearch}
+                    onChange={e => {
+                      setQuestionSearch(e.target.value);
+                      handleJumpToQuestion(e.target.value);
+                    }}
+                    className="w-14 px-2 py-0.5 rounded bg-stone-900 border border-stone-600 text-white text-xs focus:ring-1 focus:ring-amber-400 focus:outline-none"
+                  />
+                </div>
               </div>
-            </div>
+            )}
           </div>
         </div>
       </header>
@@ -214,136 +255,118 @@ export default function App() {
         </div>
       )}
 
-      {/* Main Document Preview Stage */}
+      {/* Main Document Stage */}
       <main className="flex-1 py-8 px-2 sm:px-4 flex flex-col items-center overflow-x-auto">
-        {/* VIEW MODE 1: SINGLE PAGE BOOKLET */}
-        {viewMode === 'single' && (
+        {/* DOCUMENT 1: QUESTION PAPER (20 PAGES) */}
+        {activeDocument === 'question_paper' && (
           <div className="w-full flex flex-col items-center">
-            {currentPage === 1 && <CoverPage />}
-            {currentPage === 2 && (
-              <div className="a4-sheet p-10 exam-font text-black flex flex-col justify-between select-text">
-                <div className="border border-black px-2.5 py-0.5 rounded-xs text-[11px] font-bold tracking-tight inline-block w-max">
-                  Pg-2
-                </div>
-                <div className="text-center my-auto text-stone-500 italic text-sm">
-                  (Space for Rough Work / Blank Page as in Original Test Booklet)
-                </div>
-                <div className="border-t border-black/20 pt-1 text-center text-[9px] text-stone-700">
-                  NEET (UG) - 2026 | PART TEST - XI / 02 | Test Booklet Code: PT-2
-                </div>
-              </div>
-            )}
-            {currentPage >= 3 && currentPage <= 20 && (
-              <ExamPage
-                pageNumber={currentPage}
-                questions={getQuestionsByPage(currentPage)}
-                showAnswers={showAnswers}
-              />
-            )}
+            {/* View Mode 1: Single Page Interactive */}
+            {viewMode === 'single' && (
+              <div className="w-full flex flex-col items-center">
+                {currentPage === 1 && <CoverPage />}
+                {currentPage >= 2 && currentPage <= 20 && (
+                  <ExamPage
+                    pageNumber={currentPage}
+                    questions={getQuestionsByPage(currentPage)}
+                    showAnswers={showAnswers}
+                  />
+                )}
 
-            {/* Bottom Page Navigation Controls */}
-            <div className="no-print mt-6 flex items-center gap-4 bg-white/90 backdrop-blur-xs px-5 py-2 rounded-full shadow border border-stone-300">
-              <button
-                disabled={currentPage <= 1}
-                onClick={() => {
-                  setCurrentPage(p => Math.max(1, p - 1));
-                  window.scrollTo({ top: 0, behavior: 'smooth' });
-                }}
-                className="flex items-center gap-1 text-xs font-semibold px-3 py-1.5 rounded hover:bg-stone-100 disabled:opacity-30 cursor-pointer"
-              >
-                <ChevronLeft className="w-4 h-4" />
-                <span>Previous Page</span>
-              </button>
-
-              <div className="flex items-center gap-1">
-                {Array.from({ length: totalPages }, (_, i) => i + 1).map(p => (
+                {/* Bottom Page Navigation Controls */}
+                <div className="no-print mt-6 flex items-center gap-3 bg-white/95 backdrop-blur-xs px-5 py-2 rounded-full shadow border border-stone-300">
                   <button
-                    key={p}
+                    disabled={currentPage <= 1}
                     onClick={() => {
-                      setCurrentPage(p);
+                      setCurrentPage(p => Math.max(1, p - 1));
                       window.scrollTo({ top: 0, behavior: 'smooth' });
                     }}
-                    className={`w-7 h-7 text-xs rounded-full font-medium transition-colors cursor-pointer ${
-                      currentPage === p 
-                        ? 'bg-stone-900 text-white font-bold' 
-                        : 'text-stone-600 hover:bg-stone-200'
-                    }`}
+                    className="flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded hover:bg-stone-100 disabled:opacity-30 cursor-pointer"
                   >
-                    {p}
+                    <ChevronLeft className="w-4 h-4" />
+                    <span>Prev</span>
                   </button>
+
+                  <div className="flex items-center gap-1 overflow-x-auto max-w-[50vw] sm:max-w-none px-1 py-0.5">
+                    {Array.from({ length: totalPages }, (_, i) => i + 1).map(p => (
+                      <button
+                        key={p}
+                        onClick={() => {
+                          setCurrentPage(p);
+                          window.scrollTo({ top: 0, behavior: 'smooth' });
+                        }}
+                        className={`w-7 h-7 text-xs rounded-full font-medium transition-colors cursor-pointer shrink-0 ${
+                          currentPage === p 
+                            ? 'bg-stone-900 text-white font-bold' 
+                            : 'text-stone-600 hover:bg-stone-200'
+                        }`}
+                        title={`Page ${p}`}
+                      >
+                        {p}
+                      </button>
+                    ))}
+                  </div>
+
+                  <button
+                    disabled={currentPage >= totalPages}
+                    onClick={() => {
+                      setCurrentPage(p => Math.min(totalPages, p + 1));
+                      window.scrollTo({ top: 0, behavior: 'smooth' });
+                    }}
+                    className="flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded hover:bg-stone-100 disabled:opacity-30 cursor-pointer"
+                  >
+                    <span>Next</span>
+                    <ChevronRight className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* View Mode 2: All 20 Pages Continuous (Full Booklet View) */}
+            {viewMode === 'all' && (
+              <div className="w-full flex flex-col items-center space-y-6">
+                {/* Page 1: Cover Page */}
+                <div className="page-break w-full flex justify-center">
+                  <CoverPage />
+                </div>
+
+                {/* Pages 2 to 20: 19 Question Pages */}
+                {Array.from({ length: 19 }, (_, idx) => idx + 2).map(pageNo => (
+                  <div key={pageNo} className="page-break w-full flex justify-center">
+                    <ExamPage
+                      pageNumber={pageNo}
+                      questions={getQuestionsByPage(pageNo)}
+                      showAnswers={showAnswers}
+                    />
+                  </div>
                 ))}
               </div>
-
-              <button
-                disabled={currentPage >= totalPages}
-                onClick={() => {
-                  setCurrentPage(p => Math.min(totalPages, p + 1));
-                  window.scrollTo({ top: 0, behavior: 'smooth' });
-                }}
-                className="flex items-center gap-1 text-xs font-semibold px-3 py-1.5 rounded hover:bg-stone-100 disabled:opacity-30 cursor-pointer"
-              >
-                <span>Next Page</span>
-                <ChevronRight className="w-4 h-4" />
-              </button>
-            </div>
+            )}
           </div>
         )}
 
-        {/* VIEW MODE 2: ALL 20 PAGES CONTINUOUS (Print Ready) */}
-        {viewMode === 'all' && (
-          <div className="w-full flex flex-col items-center space-y-8">
-            {/* Page 1: Cover */}
-            <CoverPage />
-
-            {/* Page 2: Blank / Rough Work */}
-            <div className="a4-sheet p-10 exam-font text-black flex flex-col justify-between page-break select-text">
-              <div className="border border-black px-2.5 py-0.5 rounded-xs text-[11px] font-bold tracking-tight inline-block w-max">
-                Pg-2
-              </div>
-              <div className="text-center my-auto text-stone-500 italic text-sm">
-                (Space for Rough Work / Blank Page as in Original Test Booklet)
-              </div>
-              <div className="border-t border-black/20 pt-1 text-center text-[9px] text-stone-700">
-                NEET (UG) - 2026 | PART TEST - XI / 02 | Test Booklet Code: PT-2
-              </div>
-            </div>
-
-            {/* Pages 3 to 20 */}
-            {Array.from({ length: 18 }, (_, idx) => idx + 3).map(pageNo => (
-              <div key={pageNo} className="page-break">
-                <ExamPage
-                  pageNumber={pageNo}
-                  questions={getQuestionsByPage(pageNo)}
-                  showAnswers={showAnswers}
-                />
-              </div>
-            ))}
-          </div>
-        )}
-
-        {/* VIEW MODE 3: OFFICIAL ANSWER KEY & SOLUTIONS */}
-        {viewMode === 'answers' && (
+        {/* DOCUMENT 2: SEPARATE ANSWER PAPER & SOLUTIONS */}
+        {activeDocument === 'answer_paper' && (
           <div className="w-full flex flex-col items-center">
-            <AnswerKeyPage />
+            <AnswerKeyPage onPrint={triggerPrintToPdf} />
           </div>
         )}
       </main>
 
-      {/* Footer Info for quick assistance */}
+      {/* Footer Info */}
       <footer className="no-print bg-stone-900 text-stone-400 text-xs py-4 px-6 border-t border-stone-800">
         <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-3 text-center sm:text-left">
           <div className="flex items-center gap-2">
-            <Info className="w-4 h-4 text-amber-400" />
+            <Info className="w-4 h-4 text-amber-400 shrink-0" />
             <span>
-              All 180 questions have been modified while maintaining the exact original test series syllabus, format, typography, NCERT references, and diagrams.
+              NEET (UG) - 2026 Test Paper: Exactly 20 pages (Page 1 Cover, Pages 2-20 all 180 questions with Space for Rough Work, zero waste space) + Separate Standalone Answer Paper.
             </span>
           </div>
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-4 shrink-0">
             <button
               onClick={handleDocxDownload}
               className="text-blue-400 hover:underline cursor-pointer"
             >
-              Export .docx
+              Export Word (.docx)
             </button>
             <span>•</span>
             <button
