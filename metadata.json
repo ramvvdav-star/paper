@@ -1,0 +1,6 @@
+{
+  "name": "NEET Test Booklet - Exact Format",
+  "description": "Full 180-question NEET practice test paper matching the exact original test series booklet format and typography with Word (.docx) and PDF export.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
